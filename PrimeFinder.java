@@ -2,15 +2,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.PriorityQueue;
+import java.util.Collections;
+import java.util.List;
+import java.util.ArrayList;
 
 public class PrimeFinder {
     private static final int MAX = 100_000_000;
     private static final boolean[] isPrime = new boolean[MAX + 1];
     private static final int THREADS = 8;
-    private static final PriorityQueue<Integer> topTenPrimes = new PriorityQueue<>();
 
     public static void main(String[] args) throws Exception {
         Arrays.fill(isPrime, true);
@@ -34,74 +34,40 @@ public class PrimeFinder {
         
         long endTime = System.currentTimeMillis();
         long executionTime = endTime - startTime;
-
-        long sumOfPrimes = 0;
-        int totalPrimesFound = 0;
+        
+        List<Integer> primeList = new ArrayList<>();
         for (int i = 2; i <= MAX; i++) {
             if (isPrime[i]) {
-                sumOfPrimes += i;
-                totalPrimesFound++;
-                topTenPrimes.add(i);
-                if (topTenPrimes.size() > 10) {
-                    topTenPrimes.poll();
-                }
+                primeList.add(i);
             }
         }
         
         PrintWriter writer = new PrintWriter("primes.txt", "UTF-8");
-        writer.println("execution time: " + executionTime + "ms");
-        writer.println("total number of primes found: " + totalPrimesFound);
-        writer.println("sum of all primes found: " + sumOfPrimes);
-        writer.print("top ten maximum primes, from lowest to highest: ");
+        writer.println(executionTime + " " + primeList.size() + " " + primeList.stream().mapToLong(Integer::longValue).sum());
         
-        int[] topPrimes = new int[topTenPrimes.size()];
-        for (int i = topPrimes.length - 1; i >= 0; i--) {
-            topPrimes[i] = topTenPrimes.poll();
-        }
-        
-        for (int i = 0; i < topPrimes.length; i++) {
-            writer.print(topPrimes[i]);
-            if (i < topPrimes.length - 1) {
-                writer.print(", ");
-            }
-        }
-        writer.println();
+        primeList.stream().sorted(Collections.reverseOrder()).limit(10).sorted().forEach(writer::println);
         writer.close();
     }
 
     static class SieveSegment implements Runnable {
-    private final int start, end;
-    private static final int sqrtLimit = (int) Math.sqrt(MAX);
-    private static final ArrayList<Integer> smallPrimes = new ArrayList<>();
+        private final int start, end;
 
-    static {
-        // Precompute the small primes
-        boolean[] isSmallPrime = new boolean[sqrtLimit + 1];
-        Arrays.fill(isSmallPrime, true);
-        for (int i = 2; i * i <= sqrtLimit; i++) {
-            if (isSmallPrime[i]) {
-                smallPrimes.add(i);
-                for (int j = i * i; j <= sqrtLimit; j += i) {
-                    isSmallPrime[j] = false;
+        SieveSegment(int start, int end) {
+            this.start = start;
+            this.end = end;
+        }
+
+        @Override
+        public void run() {
+            int sqrtLimit = (int) Math.sqrt(MAX);
+            for (int i = 2; i <= sqrtLimit; i++) {
+                if (isPrime[i]) {
+                    int startMultiple = (start + i - 1) / i * i;
+                    for (int j = Math.max(startMultiple, i * i); j <= end; j += i) {
+                        isPrime[j] = false;
+                    }
                 }
             }
         }
     }
-
-    SieveSegment(int start, int end) {
-        this.start = start;
-        this.end = end;
-    }
-
-    @Override
-    public void run() {
-        Arrays.fill(isPrime, start, end, true);
-        for (int p : smallPrimes) {
-            int firstMultiple = Math.max(p * p, (start + p - 1) / p * p);
-            for (int j = firstMultiple; j <= end; j += p) {
-                isPrime[j] = false;
-            }
-        }
-    }
-}
 }
